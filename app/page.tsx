@@ -338,32 +338,112 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
   );
 }
 /** 摘要视图 **/
-function SummaryView({ data, json, onExportMD, onExportJSON }:{ data: typeof MOCK_SUMMARY; json?: any; onExportMD: () => void; onExportJSON: () => void; }) {
+function SummaryView({ data, json, onExportMD, onExportJSON }:{ data: any; json?: any; onExportMD: () => void; onExportJSON: () => void; }) {
+  // 适配不同的数据结构：AI返回的数据 vs MOCK数据
+  const caseMeta = data?.case_meta || data?.caseMeta || {};
+  const parties = data?.parties || [];
+  const focusPoints = data?.focusPoints || data?.issues || [];
+  const statutes = data?.statutes || [];
+  const decision = data?.decision || data?.holdings || "暂无判决结果";
+  const risk = data?.risk || (data?.risks && data.risks[0]) || { level: "未知", notes: [] };
+
   return (
     <Card className="h-full rounded-2xl">
       <CardHeader><CardTitle className="text-lg">AI 摘要</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         {/* Metadata */}
-        <div className="grid grid-cols-2 gap-2 text-sm"><Pill>案号：{data.caseMeta.caseNo}</Pill><Pill>法院：{data.caseMeta.court}</Pill><Pill>日期：{data.caseMeta.date}</Pill><Pill>案由：{data.caseMeta.cause}</Pill></div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <Pill>案号：{caseMeta.case_no || caseMeta.caseNo || "未知"}</Pill>
+          <Pill>法院：{caseMeta.court || "未知"}</Pill>
+          <Pill>日期：{caseMeta.date || "未知"}</Pill>
+          <Pill>案由：{caseMeta.cause || "未知"}</Pill>
+        </div>
         {/* Parties */}
         <SectionTitle icon={ListTree} title="当事人" />
-        <div className="flex flex-wrap gap-2">{data.parties.map((p, i) => <Badge key={i} variant="secondary">{p.role} · {p.name}</Badge>)}</div>
+        <div className="flex flex-wrap gap-2">
+          {parties.map((p: any, i: number) => (
+            <Badge key={i} variant="secondary">{p.role} · {p.name}</Badge>
+          ))}
+          {parties.length === 0 && <div className="text-sm text-muted-foreground">暂无当事人信息</div>}
+        </div>
         {/* Issues */}
         <SectionTitle icon={Workflow} title="争议焦点" />
-        <div className="space-y-3">{data.focusPoints.map((f, i) => (<div key={i} className="rounded-2xl border p-3"><div className="font-medium mb-1">{i + 1}. {f.title}</div><div className="grid md:grid-cols-3 gap-2 text-sm text-muted-foreground"><div><span className="font-medium text-foreground">原告：</span>{f.plaintiff}</div><div><span className="font-medium text-foreground">被告：</span>{f.defendant}</div><div><span className="font-medium text-foreground">法院意见：</span>{f.court}</div></div></div>))}</div>
+        <div className="space-y-3">
+          {Array.isArray(focusPoints) && focusPoints.map((f: any, i: number) => {
+            if (typeof f === 'string') {
+              // 简单字符串格式（issues数组）
+              return (
+                <div key={i} className="rounded-2xl border p-3">
+                  <div className="font-medium mb-1">{i + 1}. {f}</div>
+                </div>
+              );
+            } else if (f.title) {
+              // 复杂对象格式（focusPoints数组）
+              return (
+                <div key={i} className="rounded-2xl border p-3">
+                  <div className="font-medium mb-1">{i + 1}. {f.title}</div>
+                  <div className="grid md:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                    <div><span className="font-medium text-foreground">原告：</span>{f.plaintiff}</div>
+                    <div><span className="font-medium text-foreground">被告：</span>{f.defendant}</div>
+                    <div><span className="font-medium text-foreground">法院意见：</span>{f.court}</div>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })}
+          {focusPoints.length === 0 && <div className="text-sm text-muted-foreground">暂无争议焦点</div>}
+        </div>
         {/* Statutes */}
         <SectionTitle icon={BookOpen} title="法律条款与通俗解读" />
-        <div className="space-y-2 text-sm">{data.statutes.map((s, i) => (<div key={i} className="rounded-2xl border p-3 flex items-start gap-3"><Scale className="size-4 mt-1" /><div><div className="font-medium">{s.law} · {s.article}</div><div className="text-muted-foreground">{s.explain}</div></div></div>))}</div>
+        <div className="space-y-2 text-sm">
+          {statutes.map((s: any, i: number) => (
+            <div key={i} className="rounded-2xl border p-3 flex items-start gap-3">
+              <Scale className="size-4 mt-1" />
+              <div>
+                <div className="font-medium">{s.law} · {s.article}</div>
+                <div className="text-muted-foreground">
+                  {s.explain || s.application_reasoning || s.quote_or_ref || "暂无解释"}
+                </div>
+              </div>
+            </div>
+          ))}
+          {statutes.length === 0 && <div className="text-sm text-muted-foreground">暂无法律条款</div>}
+        </div>
         {/* Decision */}
         <SectionTitle icon={ChevronRight} title="裁判结果" />
-        <Card className="border-dashed"><CardContent className="p-4 text-sm">{data.decision}</CardContent></Card>
+        <Card className="border-dashed">
+          <CardContent className="p-4 text-sm">{decision}</CardContent>
+        </Card>
         {/* Risk */}
         <SectionTitle icon={ShieldAlert} title="风险与建议" />
-        <div className="flex items-center gap-3"><Badge variant="destructive">风险：{data.risk.level}</Badge><ul className="list-disc text-sm text-muted-foreground pl-5">{data.risk.notes.map((n, i) => <li key={i}>{n}</li>)}</ul></div>
+        <div className="flex items-center gap-3">
+          <Badge variant="destructive">风险：{risk.level || "未知"}</Badge>
+          <ul className="list-disc text-sm text-muted-foreground pl-5">
+            {(risk.notes || []).map((n: string, i: number) => <li key={i}>{n}</li>)}
+            {(!risk.notes || risk.notes.length === 0) && <li>暂无风险建议</li>}
+          </ul>
+        </div>
         {/* JSON preview */}
-        {json && (<div className="space-y-2"><SectionTitle icon={FileIcon} title="结构化结果(JSON 预览)" /><Card className="bg-muted/40"><CardContent className="p-3"><pre className="text-xs overflow-auto max-h-64">{JSON.stringify(json, null, 2)}</pre></CardContent></Card></div>)}
+        {json && (
+          <div className="space-y-2">
+            <SectionTitle icon={FileIcon} title="结构化结果(JSON 预览)" />
+            <Card className="bg-muted/40">
+              <CardContent className="p-3">
+                <pre className="text-xs overflow-auto max-h-64">{JSON.stringify(json, null, 2)}</pre>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </CardContent>
-      <CardFooter className="gap-2"><Button className="gap-1" onClick={onExportMD}><Download className="size-4" />导出报告(MD)</Button><Button variant="outline" className="gap-1" onClick={onExportJSON}><Share2 className="size-4" />导出JSON</Button></CardFooter>
+      <CardFooter className="gap-2">
+        <Button className="gap-1" onClick={onExportMD}>
+          <Download className="size-4" />导出报告(MD)
+        </Button>
+        <Button variant="outline" className="gap-1" onClick={onExportJSON}>
+          <Share2 className="size-4" />导出JSON
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
@@ -717,7 +797,7 @@ async function analyzeText(rawText: string) {
           <div className="md:col-span-2 lg:col-span-3">
             <Tabs defaultValue="summary">
               <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="summary">摘要视图</TabsTrigger><TabsTrigger value="raw">原文视图</TabsTrigger><TabsTrigger value="visual">可视化</TabsTrigger></TabsList>
-              <TabsContent value="summary"><SummaryView data={activeItem.summary} json={activeItem.__json} onExportMD={() => exportMarkdown(activeItem)} onExportJSON={() => exportJSON(activeItem)} /></TabsContent>
+              <TabsContent value="summary"><SummaryView data={activeItem.__json || activeItem.summary} json={activeItem.__json} onExportMD={() => exportMarkdown(activeItem)} onExportJSON={() => exportJSON(activeItem)} /></TabsContent>
               <TabsContent value="raw"><RawView text={activeItem.raw} /></TabsContent>
               <TabsContent value="visual"><VisualView data={activeItem.summary} /></TabsContent>
             </Tabs>
