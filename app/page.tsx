@@ -249,10 +249,10 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
   };
 
   return (
-    <Card className="rounded-2xl border-2 border-dashed border-primary/20 bg-gradient-to-b from-primary/5 to-transparent">
+    <Card className="rounded-2xl border-2 border-dashed border-blue-200 bg-gradient-to-b from-blue-50 to-transparent">
       <CardHeader className="text-center">
         <CardTitle className="text-xl flex items-center justify-center gap-2">
-          <FileUp className="size-6 text-primary" />
+          <FileUp className="size-6 text-blue-600" />
           上传判决书开始分析
         </CardTitle>
         <CardDescription className="text-base">
@@ -271,10 +271,10 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
           
           {/* File Upload Area */}
           <div 
-            className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-8 text-center hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer"
+            className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
             onClick={() => !uploading && fileRef.current?.click()}
           >
-            <FileUp className="size-12 text-muted-foreground mx-auto mb-4" />
+            <FileUp className="size-12 text-slate-400 mx-auto mb-4" />
             <div className="text-lg font-medium mb-2">
               {selectedFileName || "点击选择文件或拖拽到此处"}
             </div>
@@ -319,15 +319,15 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
         )}
         
         {localText && (
-          <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <div className="font-medium text-primary">文本已载入</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="font-medium text-emerald-700">文本已载入</div>
+                <div className="text-sm text-emerald-600">
                   共 {localText.length.toLocaleString()} 字符
                 </div>
               </div>
-              <div className="text-primary">
+              <div className="text-emerald-600">
                 <FileText className="size-6" />
               </div>
             </div>
@@ -451,17 +451,6 @@ function SummaryView({ data, json, onExportMD, onExportJSON }:{ data: any; json?
             {(!risk.notes || risk.notes.length === 0) && <li>暂无风险建议</li>}
           </ul>
         </div>
-        {/* JSON preview */}
-        {json && (
-          <div className="space-y-2">
-            <SectionTitle icon={FileIcon} title="结构化结果(JSON 预览)" />
-            <Card className="bg-muted/40">
-              <CardContent className="p-3">
-                <pre className="text-xs overflow-auto max-h-64">{JSON.stringify(json, null, 2)}</pre>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -753,19 +742,19 @@ async function analyzeText(rawText: string) {
   const filteredItems = useMemo(() => !query ? items : items.filter((i) => (i.title + JSON.stringify(i.meta)).includes(query)), [items, query]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 p-4 md:p-8">
       <div className="mx-auto max-w-[1280px] space-y-4">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="size-12 grid place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-white">
+            <div className="size-12 grid place-items-center rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 text-white shadow-lg">
               <Scale className="size-6" />
             </div>
             <div>
-              <div className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
+              <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
                 Judgment Analyzer
               </div>
-              <div className="text-muted-foreground">
+              <div className="text-slate-600 font-medium">
                 AI驱动的智能判决书分析工具
               </div>
             </div>
@@ -817,7 +806,7 @@ async function analyzeText(rawText: string) {
                     size="sm" 
                     onClick={() => analyzeText((items.find(i => i.id === activeId) || items[0]).raw)} 
                     disabled={analyzing}
-                    className="gap-1"
+                    className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50"
                   >
                     <Sparkles className="size-4" />
                     {analyzing ? "分析中..." : "重新分析"}
@@ -826,7 +815,7 @@ async function analyzeText(rawText: string) {
                     variant="outline" 
                     size="sm" 
                     onClick={() => exportMarkdown(activeItem)}
-                    className="gap-1"
+                    className="gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                   >
                     <Download className="size-4" />
                     导出
