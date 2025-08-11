@@ -383,7 +383,7 @@ function RightPanelControls({ onReanalyze, analyzing }: { onReanalyze: () => voi
 }
 
 /** 根组件 **/
-export default function App() {
+export default function App() { const [pendingRaw, setPendingRaw] = useState<string>("");
   const [items, setItems] = useState<any[]>([
     { id:"a1", title:"(示例) 服务合同纠纷 — 甲公司诉乙公司", status:"已分析", meta:MOCK_SUMMARY.caseMeta, raw:MOCK_CASE_TEXT, summary:MOCK_SUMMARY, __json:null }
   ]);
@@ -413,7 +413,7 @@ export default function App() {
       data = JSON.parse(raw);
     } catch {
       console.error("Non-JSON response:", raw);
-      alert("服务端返回了非 JSON 响应，请稍后重试或联系维护者。");
+      console.error("Non-JSON response (first 300):", (raw||"").slice(0,300)); alert("服务端返回了非 JSON 响应，请稍后重试或联系维护者。");
       return;
     }
 
@@ -634,4 +634,6 @@ function Pill({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
+
+
 
