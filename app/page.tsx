@@ -19,6 +19,10 @@ import {
   FileText, Settings, Link2, Sparkles, ListTree, Workflow, ShieldAlert, CalendarClock, BookOpen, FileText as FileIcon
 } from "lucide-react";
 
+// Document processing imports - dynamic imports to avoid SSR issues
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, UnderlineType } from "docx";
+import { saveAs } from "file-saver";
+
 /** 工具函数 **/
 function sanitizeToJson(text: string) {
   const trimmed = text?.trim?.().replace?.(/^```[a-zA-Z]*\n?|```$/g, "") ?? "";
@@ -31,6 +35,70 @@ function download(filename: string, content: string, mime = "text/plain;charset=
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/** 文档解析函数 **/
+async function parseWordDocument(file: File): Promise<string> {
+  try {
+    const mammoth = await import('mammoth');
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  } catch (error) {
+    throw new Error(`Word文档解析失败: ${error instanceof Error ? error.message : '未知错误'}`);
+  }
+}
+
+async function parsePdfDocument(file: File): Promise<string> {
+  try {
+    const pdfjsLib = await import('pdfjs-dist');
+    
+    // Configure PDF.js worker
+    if (typeof window !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+    }
+    
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+    
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + '\n';
+    }
+    
+    return fullText;
+  } catch (error) {
+    throw new Error(`PDF文档解析失败: ${error instanceof Error ? error.message : '未知错误'}`);
+  }
+}
+
+async function parseTextDocument(file: File): Promise<string> {
+  try {
+    return await file.text();
+  } catch (error) {
+    throw new Error(`文本文档解析失败: ${error instanceof Error ? error.message : '未知错误'}`);
+  }
+}
+
+async function parseDocument(file: File): Promise<string> {
+  const fileExtension = file.name.toLowerCase().split('.').pop();
+  
+  switch (fileExtension) {
+    case 'docx':
+    case 'doc':
+      return await parseWordDocument(file);
+    case 'pdf':
+      return await parsePdfDocument(file);
+    case 'txt':
+      return await parseTextDocument(file);
+    default:
+      throw new Error(`不支持的文件格式: ${fileExtension}`);
+  }
 }
 
 /** 示例数据（未分析前用于占位） **/
@@ -149,10 +217,15 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   async function readFileToText(file: File) {
-    if (file.type.startsWith("text/") || file.name.toLowerCase().endsWith(".txt")) {
-      return await file.text();
+    const fileName = file.name.toLowerCase();
+    const supportedExtensions = ['.txt', '.docx', '.doc', '.pdf'];
+    const hasValidExtension = supportedExtensions.some(ext => fileName.endsWith(ext));
+    
+    if (!hasValidExtension) {
+      throw new Error("仅支持 Word (.docx, .doc)、PDF (.pdf)、文本 (.txt) 格式文件");
     }
-    throw new Error("当前仅支持 .txt 或 text/* 文件");
+    
+    return await parseDocument(file);
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -264,7 +337,7 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
           <input 
             ref={fileRef} 
             type="file" 
-            accept=".txt,text/plain" 
+            accept=".txt,.docx,.doc,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword" 
             onChange={handleFile} 
             className="hidden" 
           />
@@ -279,7 +352,7 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
               {selectedFileName || "点击选择文件或拖拽到此处"}
             </div>
             <div className="text-sm text-muted-foreground">
-              支持 .txt 格式文件
+              支持 Word (.docx, .doc)、PDF (.pdf)、文本 (.txt) 格式
             </div>
             {selectedFileName && (
               <div className="mt-3 px-4 py-2 bg-muted rounded-lg inline-block">
@@ -685,12 +758,272 @@ async function analyzeText(rawText: string) {
   }
 
   /** 导出 **/
-  function exportMarkdown(it:any) {
-    const title = it?.title || "report";
-    const json = it?.__json ? JSON.stringify(it.__json, null, 2) : "(尚无结构化结果)";
-    const md = `# 判决书分析报告\n\n**标题**：${title}\n\n## 原文（节选）\n\n${(it?.raw || "").slice(0, 1000)}\n\n## 结构化结果\n\n\`\`\`json\n${json}\n\`\`\`\n`;
-    download(`${title}.md`, md, "text/markdown;charset=utf-8");
+  async function exportToWord(item: any) {
+    try {
+      const title = item?.title || "判决书分析报告";
+      const analysisData = item?.__json || item?.summary || {};
+      
+      // 适配数据结构
+      const caseMeta = analysisData?.case_meta || analysisData?.caseMeta || {};
+      const parties = analysisData?.parties || [];
+      const focusPoints = analysisData?.focusPoints || analysisData?.issues || [];
+      const statutes = analysisData?.statutes || [];
+      const decision = analysisData?.decision || analysisData?.holdings || "暂无判决结果";
+      const risk = analysisData?.risk || (analysisData?.risks && analysisData.risks[0]) || { level: "未知", notes: [] };
+
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            // 标题
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "判决书AI分析报告",
+                  bold: true,
+                  size: 36,
+                }),
+              ],
+              heading: HeadingLevel.TITLE,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 },
+            }),
+
+            // 案件基本信息
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "案件基本信息",
+                  bold: true,
+                  size: 28,
+                  underline: { type: UnderlineType.SINGLE },
+                }),
+              ],
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 200, after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ text: "案号：", bold: true }),
+                new TextRun({ text: caseMeta.case_no || caseMeta.caseNo || "未知" }),
+              ],
+              spacing: { after: 100 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ text: "法院：", bold: true }),
+                new TextRun({ text: caseMeta.court || "未知" }),
+              ],
+              spacing: { after: 100 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ text: "审理日期：", bold: true }),
+                new TextRun({ text: caseMeta.date || "未知" }),
+              ],
+              spacing: { after: 100 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ text: "案由：", bold: true }),
+                new TextRun({ text: caseMeta.cause || "未知" }),
+              ],
+              spacing: { after: 300 },
+            }),
+
+            // 当事人信息
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "当事人信息",
+                  bold: true,
+                  size: 28,
+                  underline: { type: UnderlineType.SINGLE },
+                }),
+              ],
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 200, after: 200 },
+            }),
+
+            ...parties.map((party: any) => new Paragraph({
+              children: [
+                new TextRun({ text: `${party.role}：`, bold: true }),
+                new TextRun({ text: party.name || "未知" }),
+              ],
+              spacing: { after: 100 },
+            })),
+
+            // 争议焦点
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "争议焦点",
+                  bold: true,
+                  size: 28,
+                  underline: { type: UnderlineType.SINGLE },
+                }),
+              ],
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 300, after: 200 },
+            }),
+
+            ...focusPoints.map((point: any, index: number) => {
+              if (typeof point === 'string') {
+                return new Paragraph({
+                  children: [
+                    new TextRun({ text: `${index + 1}. `, bold: true }),
+                    new TextRun({ text: point }),
+                  ],
+                  spacing: { after: 200 },
+                });
+              } else if (point.title) {
+                return new Paragraph({
+                  children: [
+                    new TextRun({ text: `${index + 1}. ${point.title}`, bold: true }),
+                  ],
+                  spacing: { after: 100 },
+                });
+              }
+              return new Paragraph({ children: [] });
+            }),
+
+            // 法律条款
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "适用法律条款",
+                  bold: true,
+                  size: 28,
+                  underline: { type: UnderlineType.SINGLE },
+                }),
+              ],
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 300, after: 200 },
+            }),
+
+            ...statutes.map((statute: any, index: number) => [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${index + 1}. ${statute.law} ${statute.article}`, bold: true }),
+                ],
+                spacing: { after: 100 },
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: statute.explain || statute.application_reasoning || statute.quote_or_ref || "暂无解释",
+                    italics: true,
+                  }),
+                ],
+                spacing: { after: 200 },
+              })
+            ]).flat(),
+
+            // 判决结果
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "判决结果",
+                  bold: true,
+                  size: 28,
+                  underline: { type: UnderlineType.SINGLE },
+                }),
+              ],
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 300, after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ text: decision }),
+              ],
+              spacing: { after: 300 },
+            }),
+
+            // 风险评估
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "风险评估与建议",
+                  bold: true,
+                  size: 28,
+                  underline: { type: UnderlineType.SINGLE },
+                }),
+              ],
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 300, after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({ text: "风险等级：", bold: true }),
+                new TextRun({ text: risk.level || "未知" }),
+              ],
+              spacing: { after: 200 },
+            }),
+
+            ...(risk.notes || []).map((note: string, index: number) => new Paragraph({
+              children: [
+                new TextRun({ text: `${index + 1}. ` }),
+                new TextRun({ text: note }),
+              ],
+              spacing: { after: 100 },
+            })),
+
+            // 生成信息
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "报告生成信息",
+                  bold: true,
+                  size: 24,
+                }),
+              ],
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `生成时间：${new Date().toLocaleString('zh-CN')}`,
+                  italics: true,
+                }),
+              ],
+              spacing: { after: 100 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "本报告由Judgment Analyzer AI系统自动生成，仅供参考，不构成法律意见。",
+                  italics: true,
+                  size: 20,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 200 },
+            }),
+          ],
+        }],
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      const blob = new Blob([buffer], { 
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+      });
+      saveAs(blob, `${title.replace(/[^\w\s-]/g, '')}-分析报告.docx`);
+      
+    } catch (error) {
+      console.error("Word文档导出失败:", error);
+      alert("Word文档导出失败，请重试");
+    }
   }
+  
   function exportJSON(it:any) {
     const title = it?.title || "report";
     const json = it?.__json ? JSON.stringify(it.__json, null, 2) : "{}";
@@ -702,7 +1035,7 @@ async function analyzeText(rawText: string) {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
-    input.accept = '.txt,text/plain';
+    input.accept = '.txt,.docx,.doc,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword';
     input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (!files?.length) return;
@@ -710,7 +1043,7 @@ async function analyzeText(rawText: string) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         try {
-          const text = await file.text();
+          const text = await parseDocument(file);
           const id = Math.random().toString(36).slice(2, 9);
           const item = { 
             id, 
@@ -723,6 +1056,7 @@ async function analyzeText(rawText: string) {
           setItems(prev => [item, ...prev]);
         } catch (err: any) {
           console.error(`Failed to import ${file.name}:`, err);
+          alert(`导入 ${file.name} 失败: ${err.message}`);
         }
       }
       alert(`成功导入 ${files.length} 个文件`);
@@ -814,11 +1148,11 @@ async function analyzeText(rawText: string) {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => exportMarkdown(activeItem)}
+                    onClick={() => exportToWord(activeItem)}
                     className="gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                   >
                     <Download className="size-4" />
-                    导出
+                    导出Word
                   </Button>
                 </div>
               </div>
