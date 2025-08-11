@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 /** xAI (Grok) 配置 */
 const XAI_BASE = process.env.XAI_BASE || "https://api.x.ai/v1";
-const XAI_MODEL = process.env.XAI_MODEL || "grok-beta";
+const XAI_MODEL = process.env.XAI_MODEL || "grok-4";
 const API_PATH = "/chat/completions";
 
 /** 输出模式的 JSON 模板 */
