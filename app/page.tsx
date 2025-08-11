@@ -397,28 +397,39 @@ export default function App() {
 
   /** 调用后端分析函数 **/
   async function analyzeText(rawText: string) {
-    if (!rawText?.trim()) return alert("没有可分析的文本");
-    const mode = (window as any).__analysisMode || "lawyer";
-    setAnalyzing(true);
+  if (!rawText?.trim()) { alert("没有可分析的文本"); return; }
+  const mode = (window as any).__analysisMode || "lawyer";
+  try {
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode, text: rawText })
+    });
+
+    const raw = await res.text();
+
+    let data: any;
     try {
-      const res = await fetch("/api/analyze", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ mode, text: rawText }) });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || errorData.message || `HTTP ${res.status}: ${res.statusText}`);
-      }
-      
-      const data = await res.json();
-      const json = typeof data === "string" ? sanitizeToJson(data) : data;
-      setItems(prev => prev.map(it => it.id === activeId ? { ...it, __json: json, status:"已分析" } : it));
-    } catch (e: any) {
-      console.error("Analysis error:", e);
-      const errorMessage = e?.message || "分析失败，请检查网络连接和API配置";
-      alert(`分析失败: ${errorMessage}`);
-    } finally {
-      setAnalyzing(false);
+      data = JSON.parse(raw);
+    } catch {
+      console.error("Non-JSON response:", raw);
+      alert("服务端返回了非 JSON 响应，请稍后重试或联系维护者。");
+      return;
     }
+
+    if (!res.ok || (data && data.ok === false)) {
+      const msg = data?.error || data?.reason || "分析失败";
+      alert(`分析失败: ${msg}`);
+      return;
+    }
+
+    const json = data;
+    setItems(prev => prev.map(it => it.id === activeId ? { ...it, __json: json, status: "已分析" } : it));
+  } catch (e) {
+    console.error(e);
+    alert("分析失败，请检查 /api/analyze 与 Key/额度");
   }
+}
 
   /** 即时解读功能 **/
   async function handleInterpret() {
@@ -623,3 +634,4 @@ function Pill({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
+
