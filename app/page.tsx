@@ -249,12 +249,18 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
   };
 
   return (
-    <Card className="rounded-2xl">
-      <CardHeader>
-        <CardTitle className="text-lg">上传/抓取判决书</CardTitle>
+    <Card className="rounded-2xl border-2 border-dashed border-primary/20 bg-gradient-to-b from-primary/5 to-transparent">
+      <CardHeader className="text-center">
+        <CardTitle className="text-xl flex items-center justify-center gap-2">
+          <FileUp className="size-6 text-primary" />
+          上传判决书开始分析
+        </CardTitle>
+        <CardDescription className="text-base">
+          支持文本文件上传或网页链接抓取，AI将自动提取和分析关键信息
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid gap-2 md:grid-cols-3">
+      <CardContent className="space-y-4">
+        <div className="space-y-3">
           <input 
             ref={fileRef} 
             type="file" 
@@ -262,41 +268,46 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
             onChange={handleFile} 
             className="hidden" 
           />
-          <div className="md:col-span-2">
+          
+          {/* File Upload Area */}
+          <div 
+            className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-8 text-center hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer"
+            onClick={() => !uploading && fileRef.current?.click()}
+          >
+            <FileUp className="size-12 text-muted-foreground mx-auto mb-4" />
+            <div className="text-lg font-medium mb-2">
+              {selectedFileName || "点击选择文件或拖拽到此处"}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              支持 .txt 格式文件
+            </div>
+            {selectedFileName && (
+              <div className="mt-3 px-4 py-2 bg-muted rounded-lg inline-block">
+                <div className="text-sm font-medium">{selectedFileName}</div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* URL Input Section */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
             <Input 
-              placeholder={selectedFileName || "选择文件或拖拽到此处..."} 
-              readOnly 
-              onClick={() => !uploading && fileRef.current?.click()} 
-              value={selectedFileName}
+              placeholder="或输入网页链接进行抓取..." 
+              value={url} 
+              onChange={(e) => setUrl(e.target.value)} 
               disabled={uploading}
-              className="cursor-pointer"
+              className="h-12 text-base"
             />
           </div>
           <Button 
-            className="gap-2 w-full" 
-            onClick={() => fileRef.current?.click()} 
-            disabled={uploading}
-          >
-            <FileUp className="size-4" />
-            本地上传
-          </Button>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Input 
-            placeholder="或粘贴公开网页链接…" 
-            value={url} 
-            onChange={(e) => setUrl(e.target.value)} 
-            disabled={uploading}
-          />
-          <Button 
             variant="secondary" 
             onClick={handleFetchUrl} 
-            className="gap-1" 
+            className="gap-2 h-12 px-6" 
             disabled={!url || uploading}
           >
             <Link2 className="size-4" />
-            抓取
+            抓取内容
           </Button>
         </div>
         
@@ -308,31 +319,47 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: {
         )}
         
         {localText && (
-          <div className="p-3 bg-muted/50 rounded-lg">
-            <div className="text-sm text-muted-foreground">
-              已载入文本：{localText.length} 字符
+          <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-primary">文本已载入</div>
+                <div className="text-sm text-muted-foreground">
+                  共 {localText.length.toLocaleString()} 字符
+                </div>
+              </div>
+              <div className="text-primary">
+                <FileText className="size-6" />
+              </div>
             </div>
           </div>
         )}
       </CardContent>
       
-      <CardFooter className="justify-end gap-2">
-        <Button 
-          variant="outline" 
-          className="gap-1" 
-          onClick={handleReset}
-        >
-          <RefreshCw className="size-4" />
-          重置
-        </Button>
-        <Button 
-          className="gap-1" 
-          onClick={handleAnalyze} 
-          disabled={!localText || analyzing}
-        >
-          <Brain className="size-4" />
-          {analyzing ? "分析中..." : "开始分析"}
-        </Button>
+      <CardFooter className="flex flex-col gap-3">
+        <div className="flex gap-3 w-full">
+          <Button 
+            variant="outline" 
+            className="flex-1 gap-2" 
+            onClick={handleReset}
+          >
+            <RefreshCw className="size-4" />
+            重置
+          </Button>
+          <Button 
+            className="flex-1 gap-2 text-base h-12" 
+            onClick={handleAnalyze} 
+            disabled={!localText || analyzing}
+            size="lg"
+          >
+            <Brain className="size-5" />
+            {analyzing ? "AI分析中..." : "开始AI分析"}
+          </Button>
+        </div>
+        {analyzing && (
+          <div className="w-full text-center text-sm text-muted-foreground">
+            正在使用AI分析判决书内容，请耐心等待...
+          </div>
+        )}
       </CardFooter>
     </Card>
   );
@@ -436,14 +463,6 @@ function SummaryView({ data, json, onExportMD, onExportJSON }:{ data: any; json?
           </div>
         )}
       </CardContent>
-      <CardFooter className="gap-2">
-        <Button className="gap-1" onClick={onExportMD}>
-          <Download className="size-4" />导出报告(MD)
-        </Button>
-        <Button variant="outline" className="gap-1" onClick={onExportJSON}>
-          <Share2 className="size-4" />导出JSON
-        </Button>
-      </CardFooter>
     </Card>
   );
 }
@@ -499,7 +518,6 @@ function RightPanelControls({ onReanalyze, analyzing }: { onReanalyze: () => voi
   const [mode, setMode] = useState("lawyer");
   const [normalize, setNormalize] = useState(true);
   const [highlight, setHighlight] = useState(true);
-  const [exportFormats, setExportFormats] = useState({ pdf: true, docx: false, xlsx: false });
   
   useEffect(() => { (window as any).__analysisMode = mode; }, [mode]);
 
@@ -508,7 +526,6 @@ function RightPanelControls({ onReanalyze, analyzing }: { onReanalyze: () => voi
       mode,
       normalize,
       highlight,
-      exportFormats,
       timestamp: new Date().toISOString()
     };
     localStorage.setItem('judgment-analyzer-config', JSON.stringify(config));
@@ -516,10 +533,10 @@ function RightPanelControls({ onReanalyze, analyzing }: { onReanalyze: () => voi
   };
 
   return (
-    <Card className="rounded-2xl">
-      <CardHeader><CardTitle className="text-lg">分析设置</CardTitle></CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        <AnalysisModeSelector onChange={(m) => setMode(m)} value={mode} />
+    <div className="space-y-4">
+      <AnalysisModeSelector onChange={(m) => setMode(m)} value={mode} />
+      
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label htmlFor="normalize">术语通俗化</Label>
           <Switch id="normalize" checked={normalize} onCheckedChange={setNormalize} />
@@ -528,45 +545,17 @@ function RightPanelControls({ onReanalyze, analyzing }: { onReanalyze: () => voi
           <Label htmlFor="highlight">原文关键字高亮</Label>
           <Switch id="highlight" checked={highlight} onCheckedChange={setHighlight} />
         </div>
-        <div className="space-y-2">
-          <Label>导出格式</Label>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="pdf" 
-                checked={exportFormats.pdf} 
-                onCheckedChange={(checked) => setExportFormats(prev => ({ ...prev, pdf: !!checked }))} 
-              />
-              <Label htmlFor="pdf">PDF</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="docx" 
-                checked={exportFormats.docx} 
-                onCheckedChange={(checked) => setExportFormats(prev => ({ ...prev, docx: !!checked }))} 
-              />
-              <Label htmlFor="docx">Word</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="xlsx" 
-                checked={exportFormats.xlsx} 
-                onCheckedChange={(checked) => setExportFormats(prev => ({ ...prev, xlsx: !!checked }))} 
-              />
-              <Label htmlFor="xlsx">Excel</Label>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter className="gap-2">
-        <Button variant="outline" className="gap-1" onClick={handleSaveConfig}>
-          <Settings className="size-4" />保存配置
-        </Button>
-        <Button onClick={onReanalyze} className="gap-1" disabled={analyzing}>
-          <Sparkles className="size-4" />{analyzing ? "重新分析中..." : "重新分析"}
-        </Button>
-      </CardFooter>
-    </Card>
+      </div>
+      
+      <Button 
+        variant="outline" 
+        className="w-full gap-1" 
+        onClick={handleSaveConfig}
+      >
+        <Settings className="size-4" />
+        保存配置
+      </Button>
+    </div>
   );
 }
 
@@ -767,70 +756,138 @@ async function analyzeText(rawText: string) {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white p-4 md:p-8">
       <div className="mx-auto max-w-[1280px] space-y-4">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="size-9 grid place-items-center rounded-2xl bg-black text-white"><Scale className="size-4" /></div>
-            <div><div className="text-xl font-semibold">Judgment Analyzer</div><div className="text-xs text-muted-foreground">判决书自动分析 · MVP（Edge API 已接通）</div></div>
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="size-12 grid place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-white">
+              <Scale className="size-6" />
+            </div>
+            <div>
+              <div className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
+                Judgment Analyzer
+              </div>
+              <div className="text-muted-foreground">
+                AI驱动的智能判决书分析工具
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索：案号/法院/案由/标题…" />
-            <Button variant="secondary" className="gap-1 w-full md:w-auto" onClick={() => setQuery("")} disabled={!query}><Search className="size-4" />清除搜索</Button>
+          
+          {/* Search Bar */}
+          <div className="max-w-md mx-auto flex items-center gap-2">
+            <Input 
+              value={query} 
+              onChange={(e) => setQuery(e.target.value)} 
+              placeholder="搜索案件..." 
+              className="h-10"
+            />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setQuery("")} 
+              disabled={!query}
+            >
+              <Search className="size-4" />
+            </Button>
           </div>
         </div>
-        {/* Top Actions */}
-        <div className="grid md:grid-cols-3 gap-4">
+        {/* Upload Section - Centered and Prominent */}
+        <div className="max-w-4xl mx-auto">
           <Uploader onUploaded={(item) => { setItems((prev) => [{ ...item }, ...prev]); setActiveId(item.id); }} onAnalyze={(rawText) => analyzeText(rawText)} analyzing={analyzing} />
-          <Card className="rounded-2xl">
-            <CardHeader><CardTitle className="text-lg">快捷操作</CardTitle><CardDescription>批量分析 / 模板导出</CardDescription></CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="justify-start gap-2" onClick={handleBatchImport}><FileText className="size-4" />批量导入</Button>
-              <Button variant="outline" className="justify-start gap-2" onClick={() => exportMarkdown(activeItem)}><Download className="size-4" />导出报告(MD)</Button>
-              <Button variant="outline" className="justify-start gap-2" onClick={() => exportJSON(activeItem)}><Share2 className="size-4" />导出JSON</Button>
-              <Button variant="outline" className="justify-start gap-2" onClick={handleReindex}><RefreshCw className="size-4" />重新索引</Button>
-            </CardContent>
-          </Card>
-          <RightPanelControls onReanalyze={() => analyzeText((items.find(i => i.id === activeId) || items[0]).raw)} analyzing={analyzing} />
         </div>
-        {/* Main section */}
-        <div className="grid md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <div className="md:col-span-1 lg:col-span-2"><Sidebar items={filteredItems} activeId={activeItem?.id} onSelect={setActiveId} /></div>
-          <div className="md:col-span-2 lg:col-span-3">
-            <Tabs defaultValue="summary">
-              <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="summary">摘要视图</TabsTrigger><TabsTrigger value="raw">原文视图</TabsTrigger><TabsTrigger value="visual">可视化</TabsTrigger></TabsList>
-              <TabsContent value="summary"><SummaryView data={activeItem.__json || activeItem.summary} json={activeItem.__json} onExportMD={() => exportMarkdown(activeItem)} onExportJSON={() => exportJSON(activeItem)} /></TabsContent>
-              <TabsContent value="raw"><RawView text={activeItem.raw} /></TabsContent>
-              <TabsContent value="visual"><VisualView data={activeItem.summary} /></TabsContent>
-            </Tabs>
+        {/* Main Content Area */}
+        <div className="grid lg:grid-cols-12 gap-6">
+          {/* Left Sidebar - Case List */}
+          <div className="lg:col-span-3 order-2 lg:order-1">
+            <Sidebar items={filteredItems} activeId={activeItem?.id} onSelect={setActiveId} />
           </div>
-          <div className="md:col-span-1 lg:col-span-2">
-            <Card className="rounded-2xl h-full">
-              <CardHeader><CardTitle className="text-lg">即时解读</CardTitle><CardDescription>选中文本 → 一键问答</CardDescription></CardHeader>
-              <CardContent className="space-y-2">
-                <Textarea 
-                  placeholder="在这里输入/粘贴任意段落，获取 AI 通俗解读与要点…" 
-                  value={interpretText} 
-                  onChange={(e) => setInterpretText(e.target.value)}
-                  disabled={interpreting}
-                />
+          
+          {/* Main Analysis Area */}
+          <div className="lg:col-span-6 order-1 lg:order-2">
+            <Tabs defaultValue="summary" className="h-full">
+              <div className="flex items-center justify-between mb-4">
+                <TabsList className="grid grid-cols-3">
+                  <TabsTrigger value="summary">AI 摘要</TabsTrigger>
+                  <TabsTrigger value="raw">原文</TabsTrigger>
+                  <TabsTrigger value="visual">可视化</TabsTrigger>
+                </TabsList>
+                
+                {/* Analysis Controls */}
                 <div className="flex gap-2">
-                  <Button className="gap-1" onClick={handleInterpret} disabled={!interpretText || interpreting}>
-                    <Sparkles className="size-4" />{interpreting ? "解读中..." : "解读"}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => analyzeText((items.find(i => i.id === activeId) || items[0]).raw)} 
+                    disabled={analyzing}
+                    className="gap-1"
+                  >
+                    <Sparkles className="size-4" />
+                    {analyzing ? "分析中..." : "重新分析"}
                   </Button>
-                  <Button variant="outline" className="gap-1" onClick={handleGeneratePoints} disabled={!interpretText || interpreting}>
-                    <Brain className="size-4" />{interpreting ? "生成中..." : "生成要点"}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => exportMarkdown(activeItem)}
+                    className="gap-1"
+                  >
+                    <Download className="size-4" />
+                    导出
                   </Button>
                 </div>
-                <div className="text-xs text-muted-foreground">支持：释义、要点、对方可能抗辩、可引用法条</div>
-                {interpretResult && (
-                  <div className="mt-4 space-y-2">
-                    <div className="text-sm font-medium text-foreground">AI 解读结果</div>
-                    <Card className="bg-muted/40">
-                      <CardContent className="p-3">
-                        <pre className="text-xs overflow-auto max-h-48 whitespace-pre-wrap">{interpretResult}</pre>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
+              </div>
+              
+              <TabsContent value="summary" className="mt-0">
+                <SummaryView 
+                  data={activeItem.__json || activeItem.summary} 
+                  json={activeItem.__json} 
+                  onExportMD={() => exportMarkdown(activeItem)} 
+                  onExportJSON={() => exportJSON(activeItem)} 
+                />
+              </TabsContent>
+              <TabsContent value="raw" className="mt-0">
+                <RawView text={activeItem.raw} />
+              </TabsContent>
+              <TabsContent value="visual" className="mt-0">
+                <VisualView data={activeItem.summary} />
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          {/* Right Panel - Settings & Quick Actions */}
+          <div className="lg:col-span-3 order-3 space-y-4">
+            {/* Analysis Mode Selector */}
+            <Card className="rounded-2xl">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">分析设置</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RightPanelControls 
+                  onReanalyze={() => analyzeText((items.find(i => i.id === activeId) || items[0]).raw)} 
+                  analyzing={analyzing} 
+                />
+              </CardContent>
+            </Card>
+            
+            {/* Quick Actions */}
+            <Card className="rounded-2xl">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">快速操作</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2" 
+                  onClick={handleBatchImport}
+                >
+                  <FileText className="size-4" />
+                  批量导入文件
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2" 
+                  onClick={handleReindex}
+                >
+                  <RefreshCw className="size-4" />
+                  重新索引
+                </Button>
               </CardContent>
             </Card>
           </div>
