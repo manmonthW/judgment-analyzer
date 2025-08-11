@@ -1,4 +1,4 @@
-﻿// app/api/analyze/route.ts
+// app/api/analyze/route.ts
 export const runtime = "edge";
 import { NextResponse } from "next/server";
 
@@ -22,20 +22,20 @@ function buildPrompt(mode: string, text: string) {
   const schema = SCHEMAS[mode] ?? SCHEMAS.lawyer;
   const map: Record<string, { system: string; user: string }> = {
     lawyer: {
-      system: "浣犳槸璧勬繁璇夎寰嬪笀鐨勬枃涔﹀垎鏋愬姪鎵嬨€備弗鏍间緷鎹粰瀹氭枃鏈紝涓嶈噯閫犮€傝緭鍑哄繀椤讳负鍚堟硶 JSON銆?,
-      user: `浠呰緭鍑?JSON锛堜笉瑕佷换浣曢澶栨枃瀛楋級锛歕n${schema}\n\n銆愬垽鍐充功鍘熸枃銆慭n${text}`
+      system: "You are a senior litigation assistant for judgment analysis. Use ONLY the provided text. Output MUST be valid JSON and nothing else.",
+      user: `Return JSON ONLY (no extra words):\n${schema}\n\n[ORIGINAL TEXT]\n${text}`
     },
     corporate: {
-      system: "浣犳槸浼佷笟娉曞姟椋庨櫓鍒嗘瀽鍔╂墜銆備粎浣跨敤缁欏畾鏂囨湰锛岃緭鍑?JSON銆?,
-      user: `浠呰緭鍑?JSON锛歕n${schema}\n\n銆愬師鏂囥€慭n${text}`
+      system: "You are a corporate legal risk analysis assistant. Use ONLY the provided text. Output JSON only.",
+      user: `Return JSON ONLY:\n${schema}\n\n[ORIGINAL TEXT]\n${text}`
     },
     media: {
-      system: "浣犳槸娉曞緥涓庡叕鍏变簨鍔¤鑰?鐮旂┒鍛樺姪鎵嬨€備粎杈撳嚭 JSON銆?,
-      user: `浠呰緭鍑?JSON锛歕n${schema}\n\n銆愬師鏂囥€慭n${text}`
+      system: "You are a research assistant for legal/news editors. Use ONLY the provided text. Output JSON only.",
+      user: `Return JSON ONLY:\n${schema}\n\n[ORIGINAL TEXT]\n${text}`
     },
     public: {
-      system: "浣犳槸闈㈠悜鏅€氬叕浼楃殑娉曞緥瑙ｉ噴鍔╂墜銆備粎杈撳嚭 JSON銆?,
-      user: `浠呰緭鍑?JSON锛歕n${schema}\n\n銆愬師鏂囥€慭n${text}`
+      system: "You explain judgments in plain language for the public. Use ONLY the provided text. Output JSON only.",
+      user: `Return JSON ONLY:\n${schema}\n\n[ORIGINAL TEXT]\n${text}`
     }
   };
   return map[mode] ?? map.lawyer;
