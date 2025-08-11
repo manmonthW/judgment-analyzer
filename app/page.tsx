@@ -53,13 +53,48 @@ async function parsePdfDocument(file: File): Promise<string> {
   try {
     const pdfjsLib = await import('pdfjs-dist');
     
-    // Configure PDF.js worker
-    if (typeof window !== 'undefined') {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+    // Try different worker sources in order of preference
+    const workerSources = [
+      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`,
+      `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
+      // Fallback: disable worker (slower but more compatible)
+      null
+    ];
+    
+    let pdf;
+    let workerConfigured = false;
+    
+    for (const workerSrc of workerSources) {
+      try {
+        if (typeof window !== 'undefined' && workerSrc && !workerConfigured) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+          workerConfigured = true;
+        }
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({
+          data: arrayBuffer,
+          useSystemFonts: false,
+          disableFontFace: false,
+          verbosity: 0,
+          // Disable worker if no worker source available
+          useWorkerFetch: !!workerSrc,
+          isEvalSupported: false
+        });
+        
+        pdf = await loadingTask.promise;
+        break; // Success, exit loop
+      } catch (workerError) {
+        console.warn('PDF worker failed, trying next option:', workerError);
+        // Try next worker source or fallback
+        continue;
+      }
     }
     
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    if (!pdf) {
+      throw new Error('无法加载PDF文档，所有解析方式都失败了');
+    }
+    
     let fullText = '';
     
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -71,9 +106,13 @@ async function parsePdfDocument(file: File): Promise<string> {
       fullText += pageText + '\n';
     }
     
-    return fullText;
+    return fullText.trim();
   } catch (error) {
-    throw new Error(`PDF文档解析失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    console.error('PDF parsing error:', error);
+    
+    // Provide helpful error message with alternatives
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    throw new Error(`PDF文档解析失败: ${errorMessage}。建议：请尝试将PDF转换为Word格式或复制文本内容到txt文件后重新上传。`);
   }
 }
 
