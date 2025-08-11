@@ -137,7 +137,11 @@ function Sidebar({ items, onSelect, activeId }: any) {
 }
 
 /** 上传/抓取 + 开始分析 **/
-function Uploader({ onUploaded, onAnalyze, analyzing }: { onUploaded: (item: any) => void; onAnalyze: (rawText: string) => void; analyzing: boolean; }) {
+function Uploader({ onUploaded, onAnalyze, analyzing }: { 
+  onUploaded: (item: any) => void; 
+  onAnalyze: (rawText: string) => void; 
+  analyzing: boolean; 
+}) {
   const [uploading, setUploading] = useState(false);
   const [url, setUrl] = useState("");
   const [localText, setLocalText] = useState("");
@@ -145,50 +149,119 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: { onUploaded: (item: any
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   async function readFileToText(file: File) {
-    if (file.type.startsWith("text/") || file.name.toLowerCase().endsWith(".txt")) return await file.text();
+    if (file.type.startsWith("text/") || file.name.toLowerCase().endsWith(".txt")) {
+      return await file.text();
+    }
     throw new Error("当前仅支持 .txt 或 text/* 文件");
   }
+
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const input = fileRef.current;
     const f = e.target.files?.[0];
-    if (!f) { if (input) input.value = ""; return; }
+    if (!f) { 
+      if (input) input.value = ""; 
+      return; 
+    }
+    
     setUploading(true);
     try {
       const text = await readFileToText(f);
       setLocalText(text);
       setSelectedFileName(f.name);
+      
       const id = Math.random().toString(36).slice(2, 9);
-      onUploaded({ id, title: f.name, status: "待分析", meta: {}, raw: text, summary: MOCK_SUMMARY });
+      const newItem = { 
+        id, 
+        title: f.name, 
+        status: "待分析", 
+        meta: {}, 
+        raw: text, 
+        summary: MOCK_SUMMARY 
+      };
+      
+      onUploaded(newItem);
+      console.log("File uploaded successfully, text length:", text.length);
     } catch (err: any) {
+      console.error("File reading error:", err);
       alert(err.message || "读取文件失败");
     } finally {
       setUploading(false);
       if (input) input.value = "";
     }
   }
+
   async function handleFetchUrl() {
     if (!url) return;
     setUploading(true);
     try {
       const r = await fetch(url);
+      if (!r.ok) {
+        throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+      }
+      
       const html = await r.text();
-      const text = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      const text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      
       setLocalText(text);
       setSelectedFileName(`抓取自: ${url}`);
+      
       const id = Math.random().toString(36).slice(2, 9);
-      onUploaded({ id, title: url, status: "待分析", meta: {}, raw: text, summary: MOCK_SUMMARY });
+      const newItem = { 
+        id, 
+        title: url, 
+        status: "待分析", 
+        meta: {}, 
+        raw: text, 
+        summary: MOCK_SUMMARY 
+      };
+      
+      onUploaded(newItem);
       setUrl("");
-    } catch {
-      alert("抓取失败，确认链接可访问");
-    } finally { setUploading(false); }
+      console.log("URL content fetched successfully, text length:", text.length);
+    } catch (error: any) {
+      console.error("URL fetch error:", error);
+      alert(`抓取失败: ${error.message}`);
+    } finally { 
+      setUploading(false); 
+    }
   }
+
+  const handleAnalyze = () => {
+    if (!localText) {
+      alert("请先上传文件或抓取网页内容");
+      return;
+    }
+    console.log("Starting analysis with text length:", localText.length);
+    onAnalyze(localText);
+  };
+
+  const handleReset = () => {
+    setLocalText(""); 
+    setSelectedFileName("");
+    setUrl("");
+    if (fileRef.current) fileRef.current.value = ""; 
+    console.log("Upload state reset");
+  };
 
   return (
     <Card className="rounded-2xl">
-      <CardHeader><CardTitle className="text-lg">上传/抓取判决书</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-lg">上传/抓取判决书</CardTitle>
+      </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid gap-2 md:grid-cols-3">
-          <input ref={fileRef} type="file" accept=".txt,text/plain" onChange={handleFile} className="hidden" />
+          <input 
+            ref={fileRef} 
+            type="file" 
+            accept=".txt,text/plain" 
+            onChange={handleFile} 
+            className="hidden" 
+          />
           <div className="md:col-span-2">
             <Input 
               placeholder={selectedFileName || "选择文件或拖拽到此处..."} 
@@ -196,10 +269,19 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: { onUploaded: (item: any
               onClick={() => !uploading && fileRef.current?.click()} 
               value={selectedFileName}
               disabled={uploading}
+              className="cursor-pointer"
             />
           </div>
-          <Button className="gap-2 w-full" onClick={() => fileRef.current?.click()} disabled={uploading}><FileUp className="size-4" />本地上传</Button>
+          <Button 
+            className="gap-2 w-full" 
+            onClick={() => fileRef.current?.click()} 
+            disabled={uploading}
+          >
+            <FileUp className="size-4" />
+            本地上传
+          </Button>
         </div>
+        
         <div className="flex items-center gap-2">
           <Input 
             placeholder="或粘贴公开网页链接…" 
@@ -207,28 +289,54 @@ function Uploader({ onUploaded, onAnalyze, analyzing }: { onUploaded: (item: any
             onChange={(e) => setUrl(e.target.value)} 
             disabled={uploading}
           />
-          <Button variant="secondary" onClick={handleFetchUrl} className="gap-1" disabled={!url || uploading}>
-            <Link2 className="size-4" />抓取
+          <Button 
+            variant="secondary" 
+            onClick={handleFetchUrl} 
+            className="gap-1" 
+            disabled={!url || uploading}
+          >
+            <Link2 className="size-4" />
+            抓取
           </Button>
         </div>
-        {uploading && <div className="space-y-2"><div className="text-sm text-muted-foreground">正在处理文本…</div><Progress value={66} /></div>}
+        
+        {uploading && (
+          <div className="space-y-2">
+            <div className="text-sm text-muted-foreground">正在处理文本…</div>
+            <Progress value={66} />
+          </div>
+        )}
+        
+        {localText && (
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <div className="text-sm text-muted-foreground">
+              已载入文本：{localText.length} 字符
+            </div>
+          </div>
+        )}
       </CardContent>
+      
       <CardFooter className="justify-end gap-2">
-        <Button variant="outline" className="gap-1" onClick={() => { 
-          setLocalText(""); 
-          setSelectedFileName("");
-          setUrl("");
-          if (fileRef.current) fileRef.current.value = ""; 
-          alert("已重置上传缓存"); 
-        }}><RefreshCw className="size-4" />重置</Button>
-        <Button className="gap-1" onClick={() => onAnalyze(localText)} disabled={!localText || analyzing}>
-          <Brain className="size-4" />{analyzing ? "分析中..." : "开始分析"}
+        <Button 
+          variant="outline" 
+          className="gap-1" 
+          onClick={handleReset}
+        >
+          <RefreshCw className="size-4" />
+          重置
+        </Button>
+        <Button 
+          className="gap-1" 
+          onClick={handleAnalyze} 
+          disabled={!localText || analyzing}
+        >
+          <Brain className="size-4" />
+          {analyzing ? "分析中..." : "开始分析"}
         </Button>
       </CardFooter>
     </Card>
   );
 }
-
 /** 摘要视图 **/
 function SummaryView({ data, json, onExportMD, onExportJSON }:{ data: typeof MOCK_SUMMARY; json?: any; onExportMD: () => void; onExportJSON: () => void; }) {
   return (
@@ -395,39 +503,65 @@ export default function App() { const [pendingRaw, setPendingRaw] = useState<str
   const [interpreting, setInterpreting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
 
-  /** 调用后端分析函数 **/
-  async function analyzeText(rawText: string) {
-  if (!rawText?.trim()) { alert("没有可分析的文本"); return; }
+/** 调用后端分析函数 **/
+async function analyzeText(rawText: string) {
+  if (!rawText?.trim()) { 
+    alert("没有可分析的文本"); 
+    return; 
+  }
+  
+  setAnalyzing(true);
   const mode = (window as any).__analysisMode || "lawyer";
+  
   try {
+    console.log("Starting analysis request:", { mode, textLength: rawText.length });
+    
     const res = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode, text: rawText })
     });
 
-    const raw = await res.text();
+    console.log("Response status:", res.status, res.statusText);
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: "网络请求失败" }));
+      console.error("API Error Response:", errorData);
+      alert(`分析失败 (${res.status}): ${errorData.error || res.statusText}`);
+      return;
+    }
 
     let data: any;
     try {
-      data = JSON.parse(raw);
-    } catch {
-      console.error("Non-JSON response:", raw);
-      console.error("Non-JSON response (first 300):", (raw||"").slice(0,300)); alert("服务端返回了非 JSON 响应，请稍后重试或联系维护者。");
+      const responseText = await res.text();
+      console.log("Raw response text:", responseText.substring(0, 200) + "...");
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("JSON Parse Error:", parseError);
+      alert("服务端返回了无效的响应格式，请检查 API 配置");
       return;
     }
 
-    if (!res.ok || (data && data.ok === false)) {
-      const msg = data?.error || data?.reason || "分析失败";
-      alert(`分析失败: ${msg}`);
+    if (data && data.ok === false) {
+      console.error("API returned error:", data);
+      alert(`分析失败: ${data.error || data.reason || "未知错误"}`);
       return;
     }
 
-    const json = data;
-    setItems(prev => prev.map(it => it.id === activeId ? { ...it, __json: json, status: "已分析" } : it));
-  } catch (e) {
-    console.error(e);
-    alert("分析失败，请检查 /api/analyze 与 Key/额度");
+    console.log("Analysis successful, updating UI...");
+    setItems(prev => prev.map(it => 
+      it.id === activeId 
+        ? { ...it, __json: data, status: "已分析" } 
+        : it
+    ));
+    
+    alert("分析完成！");
+    
+  } catch (e: any) {
+    console.error("Analysis Error:", e);
+    alert(`分析失败: ${e.message || "网络连接错误，请检查服务器状态"}`);
+  } finally {
+    setAnalyzing(false);
   }
 }
 
