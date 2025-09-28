@@ -62,15 +62,16 @@ async function parsePdfDocument(file: File): Promise<string> {
     ];
     
     let pdf;
-    let workerConfigured = false;
-    
     for (const workerSrc of workerSources) {
       try {
-        if (typeof window !== 'undefined' && workerSrc && !workerConfigured) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-          workerConfigured = true;
+        if (typeof window !== "undefined") {
+          if (workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+          } else {
+            delete (pdfjsLib.GlobalWorkerOptions as any).workerSrc;
+          }
         }
-        
+
         const arrayBuffer = await file.arrayBuffer();
         const loadingTask = pdfjsLib.getDocument({
           data: arrayBuffer,
@@ -79,13 +80,17 @@ async function parsePdfDocument(file: File): Promise<string> {
           verbosity: 0,
           // Disable worker if no worker source available
           useWorkerFetch: !!workerSrc,
+          disableWorker: workerSrc === null,
           isEvalSupported: false
         });
-        
+
         pdf = await loadingTask.promise;
         break; // Success, exit loop
       } catch (workerError) {
-        console.warn('PDF worker failed, trying next option:', workerError);
+        console.warn("PDF worker failed, trying next option:", {
+          workerSrc,
+          error: workerError
+        });
         // Try next worker source or fallback
         continue;
       }
